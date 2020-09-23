@@ -1,0 +1,220 @@
+VERSION 5.00
+Object = "{831FDD16-0C5C-11D2-A9FC-0000F8754DA1}#2.0#0"; "MSCOMCTL.OCX"
+Begin VB.UserDocument docAddIn 
+   ClientHeight    =   3825
+   ClientLeft      =   2190
+   ClientTop       =   1800
+   ClientWidth     =   10875
+   ContinuousScroll=   0   'False
+   HScrollSmallChange=   225
+   ScaleHeight     =   3825
+   ScaleWidth      =   10875
+   ScrollBars      =   0  'None
+   VScrollSmallChange=   225
+   Begin MSComctlLib.ListView lstTasks 
+      Height          =   3750
+      Left            =   30
+      TabIndex        =   0
+      Top             =   30
+      Width           =   10785
+      _ExtentX        =   19024
+      _ExtentY        =   6615
+      SortKey         =   1
+      View            =   3
+      Sorted          =   -1  'True
+      LabelWrap       =   -1  'True
+      HideSelection   =   -1  'True
+      HideColumnHeaders=   -1  'True
+      Checkboxes      =   -1  'True
+      GridLines       =   -1  'True
+      _Version        =   393217
+      ForeColor       =   -2147483640
+      BackColor       =   -2147483643
+      Appearance      =   1
+      NumItems        =   2
+      BeginProperty ColumnHeader(1) {BDD1F052-858B-11D1-B16A-00C0F0283628} 
+         Text            =   "Task"
+         Object.Width           =   18821
+      EndProperty
+      BeginProperty ColumnHeader(2) {BDD1F052-858B-11D1-B16A-00C0F0283628} 
+         SubItemIndex    =   1
+         Object.Width           =   2
+      EndProperty
+   End
+   Begin VB.Menu mnuMenu 
+      Caption         =   "Menu"
+      Visible         =   0   'False
+      Begin VB.Menu mnuNew 
+         Caption         =   "New Task"
+      End
+   End
+End
+Attribute VB_Name = "docAddIn"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = True
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = True
+Option Explicit
+Public WithEvents evtVBProjects As VBProjectsEvents
+Attribute evtVBProjects.VB_VarHelpID = -1
+Public WithEvents evtVBFiles As FileControlEvents
+Attribute evtVBFiles.VB_VarHelpID = -1
+
+Private Sub evtVBFiles_AfterWriteFile(ByVal VBProject As VBIDE.VBProject, ByVal FileType As VBIDE.vbext_FileType, ByVal FileName As String, ByVal Result As Integer)
+    If FileType = 3 Then
+        Dim path
+        path = FileName
+        GetFile CStr(path)
+    End If
+End Sub
+
+Private Sub evtVBProjects_ItemAdded(ByVal VBProject As VBIDE.VBProject)
+    Dim path As String
+    path = VBProject.FileName
+    If path = "" Then
+        Exit Sub
+    End If
+    GetFile path
+End Sub
+
+Private Sub lstTasks_Click()
+    If gblMouseClick = vbRightButton Then
+        UserDocument.PopupMenu mnuMenu
+    End If
+End Sub
+
+Private Sub lstTasks_DblClick()
+    lstTasks.ListItems.Add
+    lstTasks.StartLabelEdit
+End Sub
+
+Private Sub lstTasks_ItemCheck(ByVal Item As MSComctlLib.ListItem)
+    If Item.Checked = True Then
+        Item.ForeColor = vbGrayText
+    Else
+        Item.ForeColor = vbBlack
+    End If
+End Sub
+
+Private Sub lstTasks_MouseDown(Button As Integer, Shift As Integer, x As Single, y As Single)
+    gblMouseClick = Button
+End Sub
+
+Private Sub mnuNew_Click()
+    Dim strTask As String
+    strTask = InputBox("Enter new Task:", "New Task")
+    lstTasks.ListItems.Add , , strTask
+End Sub
+
+Private Sub UserDocument_Initialize()
+    
+    Dim path As String
+    
+    Set Me.evtVBProjects = gVBInstance.Events.VBProjectsEvents
+    Set Me.evtVBFiles = gVBInstance.Events.FileControlEvents(Nothing)
+    If gVBInstance.VBProjects.count = 0 Then
+        Exit Sub
+    Else
+        path = gVBInstance.ActiveVBProject.FileName
+        GetFile path
+    End If
+
+End Sub
+
+Public Sub LoadTasks()
+    
+    Dim count As Long
+    Dim index As Long
+    Dim lstItem As ListItem
+    Dim buffer As String
+    
+    lstTasks.ListItems.Clear
+    count = CLng(GetFromIni("tasks", "count", gblFile))
+    For index = 1 To count
+        buffer = GetFromIni("tasks", "task" & index, gblFile)
+        Set lstItem = lstTasks.ListItems.Add
+        If Mid(buffer, 1, 1) = "*" Then
+            lstItem.Checked = True
+            lstItem.ForeColor = vbGrayText
+            lstItem.Text = Mid(buffer, 2)
+            lstItem.SubItems(1) = "*"
+        Else
+            lstItem.Text = buffer
+        End If
+    Next index
+    lstTasks.SortOrder = lvwAscending
+    lstTasks.SortKey = 1
+    lstTasks.Sorted = True
+    
+End Sub
+
+Function StripNameFromPath(ByVal searchstring As String) As String
+
+    Dim Test As String
+    Dim LastSlashPos As Integer
+    Dim I
+    Dim MyPos
+    Dim searchchar As String
+    
+    Test = "NULL"
+    searchchar = "\"
+
+    For I = 1 To Len(searchstring)
+        MyPos = InStr(I, searchstring, searchchar, 1)
+        If MyPos = 0 Then
+            If Test = "NULL" Then
+                Test = Str(I)
+            End If
+        End If
+    Next I
+
+    LastSlashPos = Val(Test)
+    StripNameFromPath = Mid(searchstring, 1, LastSlashPos - 1)
+
+End Function
+
+Private Sub UserDocument_Resize()
+    lstTasks.Height = UserDocument.Height - 75
+    lstTasks.Width = UserDocument.Width - 90
+    lstTasks.ColumnHeaders(1).Width = lstTasks.Width - 115
+End Sub
+
+Private Sub UserDocument_Terminate()
+    WriteTasks
+End Sub
+
+Private Sub GetFile(path As String)
+    
+    Dim fileNumber As Integer
+    
+    path = StripNameFromPath(path)
+    gblFile = path & "todo.dat"
+    If FileExists(gblFile) = False Then
+        fileNumber = FreeFile
+        Open path & "todo.dat" For Output As #fileNumber
+        Print #fileNumber, "[Tasks]"
+        Print #fileNumber, "Count=0"
+        Close #fileNumber
+    End If
+    If lstTasks.ListItems.count > 0 Then
+        WriteTasks
+    End If
+    LoadTasks
+
+End Sub
+
+Private Sub WriteTasks()
+    Dim count As Long
+    Dim index As Long
+    Dim buffer As String
+    
+    count = lstTasks.ListItems.count
+    WriteToIni "tasks", "count", CStr(count), gblFile
+    For index = 1 To count
+        If lstTasks.ListItems.Item(index).Checked Then
+            WriteToIni "tasks", "task" & index, "*" & lstTasks.ListItems.Item(index).Text, gblFile
+        Else
+            WriteToIni "tasks", "task" & index, lstTasks.ListItems.Item(index).Text, gblFile
+        End If
+    Next index
+End Sub

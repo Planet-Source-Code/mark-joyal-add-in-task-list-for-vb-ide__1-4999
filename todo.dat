@@ -1,0 +1,7 @@
+[Tasks]
+Count=5
+task1=*Enter new task by directly entering text to listview
+task2=*Add in code for Hide event
+task3=*Check why task did not gray out when clicked.
+task4=*Sort task list by checked and non-checked
+task5=*Set listview to ghost out entry when checked off
